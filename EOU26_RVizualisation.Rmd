@@ -1,0 +1,621 @@
+---
+author: "Pauline"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(eval = FALSE)
+```
+
+# Training in data cleaning, organizing and vizualising
+
+If you want more information about how to visualize data and use RStudio, here are some links you can check out:
+
+https://r4ds.had.co.nz/data-visualisation.html
+
+https://www.bigbookofr.com/
+
+https://www.youtube.com/c/joshstarmer
+
+
+If you are new to coding with R, here are a few keyboard short cut that will make your experience more efficient:
+
+#### For Windows users:
+<ul>
+<li>To run the code : CTRL + ENTER </li>
+<li>To insert assignment operator <- : ALT + - </li>
+<li>To insert stream operator (pipe) %>% : CTRL + SHIFT + M </li>
+</ul>
+
+#### For Mac users:
+<ul>
+<li>To run the code : command + ENTER </li>
+<li>To insert assignment operator <- : option + - </li>
+<li>To insert stream operator (pipe) %>% : command + SHIFT + M </li>
+</ul>
+
+#### In this script we will be using a wide range of packages:
+If the packages are not yet installed on your computer, you will need to install them:
+
+```{r}
+#install.packages("")
+library(dplyr) ## to clean the data set => %>% , mutate(), case_when(), filter(), select()
+library(tidyr) ## to tidy up the data 
+library(lubridate) ## to play with date and time format
+library(ragg) ## to export your plots while having control over the size of the text
+library(ggplot2) ## to plot
+library(esquisse) ## if you're new to R and find creating plots with code intimidating, this package is for you!
+library(ggridges) ## extension needed in ggplot when stacking density plots
+library(cowplot) ## to combine different plots together
+library(sf) ## to use certain function when playing with geospatial data
+library(raster) ## to download raster files in R
+library(rnaturalearth) ## to have the land polygon
+library(ggspatial) ## to plot geospatial data with ggplot
+library(viridis) ## to use specific color gradient in ggplot
+library(stars) ## to tidy up geospatial data
+```
+
+
+Today we are going to play with the `penguins_raw` dataset available from the `library(palmerpenguins)`
+
+![Meet the Plamer penguins! Artwork by \@allison_horst”](https://allisonhorst.github.io/palmerpenguins/reference/figures/lter_penguins.png)
+
+
+```{r}
+library(palmerpenguins)
+Penguins <- penguins_raw
+ 
+```
+
+This data set contain the following information:
+
+A tibble with 344 rows and 17 variables:
+
+<ul>
+
+<li> **studyName**:  Sampling expedition from which data were collected, generated, etc. </li>
+
+<li> **Sample Number**: an integer denoting the continuous numbering sequence for each sample </li>
+
+<li> **Species**: a character string denoting the penguin species </li>
+
+<li> **Region**: a character string denoting the region of Palmer LTER sampling grid </li>
+
+<li> **Island**: a character string denoting the island near Palmer Station where samples were collected </li>
+
+<li> **Stage**: a character string denoting reproductive stage at sampling </li>
+
+<li> **Individual ID**: a character string denoting the unique ID for each individual in dataset </li>
+
+<li> **Clutch Completion**: a character string denoting if the study nest observed with a full clutch, i.e., 2 eggs </li>
+
+<li> **Date Egg**: a date denoting the date study nest observed with 1 egg (sampled) </li>
+
+<li> **Culmen Length**: a number denoting the length of the dorsal ridge of a bird's bill (millimeters) </li>
+
+<li> **Culmen Depth**: a number denoting the depth of the dorsal ridge of a bird's bill (millimeters) </li>
+
+<li> **Flipper Length**: an integer denoting the length penguin flipper (millimeters) </li>
+
+<li> **Body Mass**: an integer denoting the penguin body mass (grams) </li>
+
+<li> **Sex**: a character string denoting the sex of an animal </li>
+
+<li> **Delta 15 N**: a number denoting the measure of the ratio of stable isotopes 15N:14N </li>
+
+<li> **Delta 13 C**: a number denoting the measure of the ratio of stable isotopes 13C:12C </li>
+
+<li> **Comments**: a character string with text providing additional relevant information for data</li>
+
+</ul>
+
+
+Right now, the column names are not written in a efficient way for coding as they include space & parantheses. 
+```{r}
+## We will replace the space by dots:
+#colnames(Penguins) <- gsub(" ", ".", colnames(Penguins)) ## replace the space by a dot
+#colnames(Penguins) <- gsub("\\s*\\([^\\)]+\\)", "", colnames(Penguins)) ## remove the (...)
+
+## Make the column names easier to use by replacing spaces with underscores.
+Penguins <- Penguins %>% rename(Individual_ID = "Individual ID", 
+                                Clutch_Completion= "Clutch Completion", 
+                                Date_Egg = "Date Egg", 
+                                Culmen_Length_mm = "Culmen Length (mm)",
+                                Culmen_Depth_mm = "Culmen Depth (mm)",
+                                Flipper_Length_mm = "Flipper Length (mm)",
+                                Body_Mass_g = "Body Mass (g)",
+                                Delta_15N_ooo = "Delta 15 N (o/oo)",
+                                Delta_13C_ooo = "Delta 13 C (o/oo)")
+
+```
+If you keep the space, every time you are calling the column name you would have to use backquote around your column name: &grave;`colname`&grave;
+
+
+Before visualizing your data, you need to ensure that it is in the correct format `numeric`, `factor`, `Date`.
+This ensures that the data will be easily readable on a plot with a lot of information. The first step is always to clean up your dataset, and sometimes you even need to create new categories.
+
+Here is an example of how to check and correct the format of your data:
+```{r}
+str(Penguins)
+
+## Give the right format to our data 
+## Base R: works when you have Day/Month/Year
+Penguins$Date_Egg1 <- as.Date(Penguins$Date_Egg)
+str(Penguins$Date_Egg1)
+
+## With the lubridate package:
+Penguins$Date_Egg2 <- ymd(Penguins$Date_Egg)
+str(Penguins$Date_Egg2)
+
+## In the Penguins data, we can manipulate the Egg.Date to create and extract the info separately:
+library(lubridate) # required to use the function year(), month(), day()
+Penguins <- Penguins %>% mutate(Year = year(Date_Egg),
+                                Month = month(Date_Egg),
+                                Day = day(Date_Egg))
+
+```
+
+Example of making your data more readable:
+
+<ul>   
+<li> Adelie Penguin (Pygoscelis adeliae) -> Adelie </li>
+<li> Gentoo penguin (Pygoscelis papua) -> Gentoo </li>
+<li> Chinstrap penguin (Pygoscelis antarctica) -> Chinstrap </li>
+<li> MALE -> M </li>
+<li> FEMALE -> F </li>
+</ul>
+
+```{r}
+Penguins <- Penguins %>% mutate(SEX = case_when(Sex == "MALE" ~ "M",
+                                                Sex == "FEMALE" ~ "F"),
+                                SPECIES = case_when(Species == "Adelie Penguin (Pygoscelis adeliae)" ~ "Adelie",
+                                                    Species == "Gentoo penguin (Pygoscelis papua)" ~ "Gentoo",
+                                                    Species == "Chinstrap penguin (Pygoscelis antarctica)" ~ "Chinstrap"))
+
+
+```
+
+
+Example of creating a new category:
+```{r}
+## If the birds were able to lay a full clutch then we consider it is a good year for them other wise we consider it is a bad year for them
+Penguins <- Penguins %>% mutate(Quality = case_when(Clutch_Completion == "No" ~ "Bad year",
+                                                    Clutch_Completion == "Yes" ~ "Good year"))
+```
+
+
+Only keep the columns you are interested in analyzing for your future plots.
+
+```{r}
+names(Penguins)
+Penguins_clean <- Penguins %>% dplyr::select(SPECIES,SEX,Island,Quality,Date_Egg,Culmen_Length_mm,Culmen_Depth_mm,
+Flipper_Length_mm,Body_Mass_g,Delta_15N_ooo,Delta_13C_ooo)
+```
+
+
+
+#### Which type of plot can we use in data visualization?
+
+Lets brainstorm all together before looking into it:
+https://clauswilke.com/dataviz/directory-of-visualizations.html
+
+
+If you are a beginner with R, you can play with the following library to help you understand the different part of the ggplot2 package which is widely use in R vizualisation
+
+```{r}
+#install.packages("esquisse")
+library(esquisse)
+esquisse::esquisser() 
+```
+
+
+# 1) Vizualisation of amounts
+
+We can visualize amounts using density plots
+```{r}
+head(Penguins_clean)
+
+## Look at the number of individual with a good year vs individual with a bad year:
+GoodvsBad <- Penguins_clean %>% group_by(Quality) %>% summarise(counts = n())
+GoodvsBad
+
+## Plot the results from GoodvsBad:
+plot_amount1 <- ggplot(data = GoodvsBad, aes(x = Quality, y = counts, fill = Quality)) +
+            geom_bar(stat = "identity")+
+            theme_bw()
+plot_amount1
+
+
+## Look at the number of individual with a good year vs individual with a bad year, for each species:
+GoodvsBadSpecies <- Penguins_clean %>% group_by(Quality, SPECIES) %>% summarise(counts = n())
+GoodvsBadSpecies
+
+## Plot the results from GoodvsBadSpecies:
+plot_amount2 <- ggplot(data = GoodvsBadSpecies, aes(x = Quality, y = counts, fill = SPECIES)) +
+            geom_bar(stat = "identity", position=position_dodge())+
+            theme_bw()
+plot_amount2
+
+```
+# 2) Vizulisation of Proportions
+
+
+We can visualize proportions using stacked bar plots
+```{r}
+head(Penguins_clean)
+
+## Look at the number of individual with a good year vs individual with a bad year, for each species:
+GoodvsBadSpecies_perc <- Penguins_clean %>% group_by(Quality, SPECIES) %>% 
+  summarise(counts = n()) %>% 
+  mutate(perc_GoodBadSex=round(prop.table(counts) * 100))
+GoodvsBadSpecies_perc
+
+## Plot the results from GoodvsBadSpecies:
+plot_proportions1 <- ggplot(data = GoodvsBadSpecies_perc, aes(x = Quality, y = perc_GoodBadSex, fill = SPECIES)) +
+            geom_bar(stat = "identity")+
+            theme_bw() +
+  labs(y = "Percentage %", ## change the y axis title
+       title = "Proportion using Stacked bar plots")  ## give the plot a title
+
+plot_proportions1
+```
+
+
+# 3) Vizualisation of distributions
+
+We can visualize distribution using density plots
+```{r}
+head(Penguins_clean)
+names(Penguins_clean)
+
+## Look at the distribution of the body mass for Adelie Penguin only:
+plot_distribution1 <- ggplot(subset(Penguins_clean, SPECIES == "Adelie"), aes(Body_Mass_g,fill = SPECIES, colour = SPECIES)) +
+  geom_density(alpha = 0.5)
+plot_distribution1
+```
+
+We can visualize distribution using overlapping density plots
+```{r}
+## Look at the distribution of the body mass for Adelie Penguin only but discriminate between sex:
+plot_distribution2.1 <- ggplot(subset(Penguins_clean, SPECIES == "Adelie"), aes(Body_Mass_g,fill = SEX, colour = SEX)) +
+  geom_density(alpha = 0.5)
+plot_distribution2.1
+
+
+## If you want to remove the NA, you will have to do it before plotting your data:
+AdelieSex_clean <- Penguins_clean %>% filter(SPECIES == "Adelie" & !is.na(SEX))
+
+## We can now run again the second plot with the NA removed:
+plot_distribution2.2 <- ggplot(AdelieSex_clean, aes(Body_Mass_g,fill = SEX, colour = SEX)) +
+  geom_density(alpha = 0.5)
+plot_distribution2.2
+```
+
+We can visualize distribution using ridgeline plots: https://r-graph-gallery.com/294-basic-ridgeline-plot.html
+```{r}
+head(Penguins_clean)
+
+## First we need to remove the NA for the variable Delta15N & for Delta13C:
+Penguins_delta <- Penguins_clean %>% filter(!is.na(Delta_13C_ooo)) %>% filter(!is.na(Delta_15N_ooo))
+
+
+### We want to visualize the ratio of stable isotopes 15N:14N (Delta 15N), that we observe in each Island:
+plot_distribution3 <- ggplot(Penguins_delta, aes(x= Delta_15N_ooo, y=Island, fill=Island)) +
+  geom_density_ridges() +
+  theme_ridges() +
+  theme(legend.position = "none")
+plot_distribution3
+
+### We want to visualize the ratio of stable isotopes 13C:12C (Delta 13C), that we observe in each Island:
+library(ggridges) # required to use the function geom_density_rigdes()
+plot_distribution4 <- ggplot(Penguins_delta, aes(x= Delta_13C_ooo, y=Island, fill=Island)) +
+  geom_density_ridges() +
+  theme_ridges() +
+  theme(legend.position = "none")
+plot_distribution4
+
+### We can combine those two plot to appear together next to each other:
+library(cowplot)
+plot_grid(plot_distribution3,plot_distribution4)
+
+```
+
+
+
+# 4) Vizualisation of x-y relationships
+
+We can visualize x-y relationships using Scatterplots: https://www.sthda.com/english/wiki/ggplot2-scatter-plots-quick-start-guide-r-software-and-data-visualization
+```{r}
+head(Penguins_delta)
+
+## We can look at the relation ship between Delta15N & Delta13C
+plot_xyrelationship1 <- ggplot(Penguins_delta, aes(x = Delta_15N_ooo, y = Delta_13C_ooo)) +
+  geom_point(size = 1, shape = 21)
+plot_xyrelationship1
+```
+
+We can play with the setting to try and spot patterns
+```{r}
+
+## plot_xyrelationship2.1 & plot_xyrelationship2.2 are written in a different way but give you the same result:
+## If we are interested in seeing which points belong to which Species we can change the color, the shape of the points
+plot_xyrelationship2.1 <- ggplot(Penguins_delta) +
+  geom_point(aes(x = Delta_15N_ooo, y = Delta_13C_ooo, color = SPECIES, shape = SPECIES))
+plot_xyrelationship2.1
+
+## If we are interested in seeing which points belong to which Species we can change the color, the shape of the points
+plot_xyrelationship2.2 <- ggplot(Penguins_delta, aes(x = Delta_15N_ooo, y = Delta_13C_ooo, color = SPECIES, shape = SPECIES)) +
+  geom_point()
+plot_xyrelationship2.2
+
+## If we are interested in seeing which points belong to which Species we can change the color, the shape and the size of the points
+plot_xyrelationship3 <- ggplot(Penguins_delta, aes(x = Delta_15N_ooo, y = Delta_13C_ooo, color = SPECIES, shape = SPECIES, size = SPECIES)) +
+  geom_point()
+plot_xyrelationship3
+
+## When changing the color you can manually select the color for each category:
+plot_xyrelationship4 <- ggplot(Penguins_delta) +
+  geom_point(aes(x = Delta_15N_ooo, y = Delta_13C_ooo, color = SPECIES)) +
+  scale_color_manual(values = c("pink4","purple3","darkblue"))
+plot_xyrelationship4
+
+## When changing the shape you can manually select the shape for each category:
+plot_xyrelationship5 <- ggplot(Penguins_delta) +
+  geom_point(aes(x = Delta_15N_ooo, y = Delta_13C_ooo, shape = SPECIES)) +
+  scale_shape_manual(values = c(7,12,23)) 
+plot_xyrelationship5
+
+## When changing the size you can manually select the size for each category:
+plot_xyrelationship6 <- ggplot(Penguins_delta) +
+  geom_point(aes(x = Delta_15N_ooo, y = Delta_13C_ooo, size = SPECIES)) +
+  scale_size_manual(values=c(2,3,4))
+plot_xyrelationship6
+
+## You can add regression lines:
+plot_xyrelationship7 <- ggplot(Penguins_delta, aes(x = Delta_15N_ooo, y = Delta_13C_ooo, color = SPECIES)) +
+  geom_point() +
+  geom_smooth(method=lm, aes(fill=SPECIES))
+plot_xyrelationship7
+
+## You can add ellipse to the of interest:
+plot_xyrelationship8 <- ggplot(Penguins_delta, aes(x = Delta_15N_ooo, y = Delta_13C_ooo, color = SPECIES)) +
+  geom_point() +
+  stat_ellipse()
+plot_xyrelationship8
+
+```
+# 5) Vizualisation of uncertainty
+
+We can visualize uncertainty via error bars: https://www.sthda.com/english/wiki/ggplot2-error-bars-quick-start-guide-r-software-and-data-visualization
+```{r}
+head(Penguins_clean)
+
+## We will calculate the standard deviation around the mean for the flipper length of all penguin species:
+Flipper_Species <- Penguins_clean %>% group_by(SPECIES) %>% 
+  summarise(mean_flipper = mean(Flipper_Length_mm, na.rm=T),
+            sd_flipper = sd(Flipper_Length_mm, na.rm=T))
+
+## Visualize the difference in flippers length for each penguin species:
+plot_uncertainty1 <- ggplot(Flipper_Species, aes(x = SPECIES, y = mean_flipper, color = SPECIES)) +
+  geom_pointrange(aes(ymin=mean_flipper-sd_flipper, ymax=mean_flipper+sd_flipper))
+  
+plot_uncertainty1
+```
+
+# 6) Combining different variables and type of plot all together to create complex plots
+
+Create a complex plot with boxplot, density plot, and scatter points:
+
+```{r}
+
+## Remove all the NA from the data set:
+Penguins_allnarm <- Penguins_clean %>%
+  na.omit()
+
+## Reformat my table:
+library(tidyr) ## required to use the function gather()
+Penguinslong <- gather(Penguins_allnarm, key="measure", value="value", c("Culmen_Length_mm", "Culmen_Depth_mm","Flipper_Length_mm","Body_Mass_g"))
+Penguinslong$measure <- as.factor(Penguinslong$measure)
+
+## Rename my variables for them to have a pretty name appearing in the final plot:
+Penguinslong <- Penguinslong %>% mutate(measure = case_when(measure == "Culmen_Length_mm" ~ "Culmen length (mm)",
+                                                            measure == "Culmen_Depth_mm" ~ "Culmen depth (mm)",
+                                                            measure == "Flipper_Length_mm" ~ "Flipper length (mm)",
+                                                            measure == "Body_Mass_g" ~ "Body mass (g)"))
+
+
+
+
+## Build the plot:
+Penguins_SpeciesIsland_plot <- ggplot(Penguinslong, aes(x = as.factor(SPECIES), y = value)) +
+  # Individual points
+  geom_point(aes(color = SPECIES),position = position_jitter(w = .15), alpha=0.5) +
+  scale_color_manual(values = c("dodgerblue3","lightblue4","cadetblue")) +
+  # Violon plot: distributions 
+  geom_violin(aes(fill = SPECIES), alpha = 0.5) + # geom_flat_violin would not accept scale free from facet_grid or facet_wrap
+  scale_fill_manual(values = c("dodgerblue3","lightblue4","cadetblue")) +
+  # Boxplot: distributions
+  geom_boxplot(aes(fill = SPECIES),width = .25,outlier.shape = NA) +
+  # Create the facet plot: combine different variables all together on the same plot
+  facet_grid(measure ~ Island, scales = "free", #  Faceting with free y-scales to allow individual y-ranges for each row
+             switch = "y") +  # switch the side of the measured variables names from right to left
+  theme_bw() +  # Optional, better visualization with a clean background
+  # Adjust every parameter in your plot as you like
+  theme(
+    strip.text.x = element_text(size = 12),  # Adjust text size for Species facets
+    strip.text.y = element_text(size = 12),   # Adjust text size for measure facets
+    axis.text = element_text(size=12, color = "black"), # Adjust the axis text
+    axis.title = element_blank(),  # Adjust the axis title
+    legend.title = element_text(size = 12), # Adjust the legend title 
+    legend.text = element_text(size = 12) # Adjust the legend text
+  ) +
+  scale_y_continuous("value", position = "right")  # change the y-axis scale on the right
+Penguins_SpeciesIsland_plot
+
+### Try to export the plot directly from the console while having control over the size of the text and lines:
+setwd("")
+library(ragg)
+## Scaling change the size of the text on my plot
+ragg::agg_png("Penguins_SpeciesIsland_plot_10x10_2.png", width = 10, height = 10, units = "in", res = 300, scaling = 2)
+Penguins_SpeciesIsland_plot
+dev.off()
+
+
+```
+
+
+# 7) Vizualisation of Geospatial data
+
+We can combine spatial data with remote sensing, in our case, we are combining it with the data coming from Copernicus from the following link: https://data.marine.copernicus.eu/product/SST_GLO_SST_L4_NRT_OBSERVATIONS_010_001/description
+
+To understand the data you are extracting and about to analysis it is good to check the User Manual provided on the webpage of the product you are interested in.
+
+In the User Manual we can see that the analysed_sst in the file is express in Kelvin 
+
+We can visualize spatial data using 
+```{r}
+head(Penguins_clean)
+
+### Coordinates of the three colonies: Latitude then Longitude
+Dream <-c(-64.730419, -64.247602)
+Biscoe <- c(-66.286626, -67.033080) 
+Torgersen <- c(-64.765938, -64.082502)
+
+Colonies <- data.frame(Names =c("Dream","Biscoe","Torgersen"),
+                       Latitude = c (-64.730419, -66.286626,-64.765938),
+                       Longitude = c(-64.247602,-67.033080,-64.082502))
+
+## Extract the land map of the area we are interested in
+library(rnaturalearth)
+antarctica <- ne_countries(scale = 10, returnclass = "sf", country = "Antarctica")
+plot(antarctica)
+
+## Extract only the area I want to focus on which is the Region of Anvers where we have the three island:
+library(sf)
+anvers <- st_crop(antarctica$geometry, xmin = -70.4, xmax = -63, ymin = -66.5, ymax = -64.5) 
+plot(anvers)
+
+### Import data remote sensing data:
+library(raster)
+SST <- raster("~/YOUR_COMPUTER_DIRECTORIES/20251214120000-UKMO-L4_GHRSST-SSTfnd-OSTIA-GLOB-v02.0-fv02.0.nc")
+
+
+### Create a crop to extract the data only for the area of interest
+pr.e <- extent(-70.4, -63, -66.5, -64.5) # Anvers Region
+pr.SST <- crop(SST, pr.e)
+dfSST <- as.data.frame(pr.SST, xy = TRUE)
+str(dfSST)
+
+### Convert the data from Kelvin to °C:
+dfSSTc <- dfSST %>% mutate(SST_celsius = analysed.sea.surface.temperature - 273.15) %>%
+  mutate(Zone = case_when(SST_celsius < 0 ~ "Very cold",
+                          SST_celsius >= 0 ~ "Cold"))
+  
+range(dfSSTc$SST_celsius, na.rm=T)
+unique(dfSSTc$SST_celsius, na.rm=T)
+
+
+### We can plot everything the first results: including the Zone category color, the colonies locations, and the map of the island
+library(ggspatial) ## necessary to use geom_spatial_point()
+plot_geospatial1 <- ggplot() +
+  geom_raster(data = dfSSTc, aes(x = x, y = y, fill = as.factor(Zone))) +
+  scale_fill_manual(name = "Sea Surface Zones", values = c("#33CCFF","#FFFFFF")) +
+  # Show the map:
+  geom_sf(data = anvers, fill = "bisque3", inherit.aes = FALSE) +
+  # Show the location of the three different colonies:
+  geom_spatial_point(data=Colonies,aes(x=Longitude,y=Latitude),
+                     size=3, crs=4326, shape = 21, stroke = 0.5, fill = c("#FF33CC")) +
+  labs(title = "Colonies and SST")
+plot_geospatial1
+
+### We can plot everything the first results: including the Zone category color, the colonies locations, and the map of the island
+library(viridis) ## necessry to use scale_fill_viridis
+plot_geospatial2 <- ggplot() +
+  geom_raster(data = dfSSTc, aes(x = x, y = y, fill = SST_celsius)) +
+  scale_fill_viridis(option = "D") + ## you can try different letter from A to H
+  # Show the map:
+  geom_sf(data = anvers, fill = "bisque3", inherit.aes = FALSE) +
+  # Show the location of the three different colonies:
+  geom_spatial_point(data=Colonies,aes(x=Longitude,y=Latitude),
+                     size=3, crs=4326, shape = 21, stroke = 0.5, fill = c("#FF33CC")) +
+  labs(title = "Colonies and SST")
+plot_geospatial2
+
+```
+
+If you work with GPS tracking data, you can extract the information from remote sensing for the specific GPS location and you can plot everything together
+
+
+
+```{r}
+## Let's create fake GPS position in the Anvers Region:
+bbox_lonlat <- st_bbox(c(xmin = -70.4, xmax = -63, ymin = -66.5, ymax = -64.5),
+                       crs = st_crs(4326))
+
+## Convert the box into a polygon:
+bbox_poly <- st_as_sfc(bbox_lonlat)
+
+## Sample in the area of interest
+set.seed(123)
+sample_points <- st_sample(bbox_poly, size = 200)
+
+## Remove sampled point thats might have been created on land that are in the area:
+random_GPS_points <- sample_points[
+  !st_intersects(sample_points, anvers, sparse = FALSE)
+]
+
+## keep only 30 computed random points
+random_GPS_points30 <- random_GPS_points[1:30]
+head(random_GPS_points30)
+random_GPS_points30df <- as.data.frame(st_coordinates(random_GPS_points30))
+
+## Give a penguin species to location of the random_GPS dataset:
+random_GPS_points30df <- random_GPS_points30df %>% mutate(Species = case_when(X < -68 ~ "Adelie",
+                                                                              X > -69 & X < -64 ~ "Gentoo",
+                                                                              X > -65 ~ "Chinstrap"))
+
+## Visually inspect if the created GPS position have correct coordinates and overlap with the study area:
+plot_geospatial3 <- ggplot() +
+  geom_raster(data = dfSSTc, aes(x = x, y = y, fill = as.factor(Zone))) +
+  scale_fill_manual(name = "Sea Surface Zones", values = c("#33CCFF","#FFFFFF")) +
+  # Show the map:
+  geom_sf(data = anvers, fill = "bisque3", inherit.aes = FALSE) +
+  # Show the location of the three different colonies:
+  geom_spatial_point(data=Colonies,aes(x=Longitude,y=Latitude),
+                     size=3, crs=4326, shape = 21, stroke = 0.5, fill = c("#FF33CC")) +
+  ## Show the location of the fake-GPS points:
+  #geom_point(data = random_GPS_points30df, aes(x = X, y = Y), color = "black", shape = 21, size = 2, fill = c("#FFCCCC")) +
+  geom_point(data = random_GPS_points30df, aes(x = X, y = Y,  color = Species), size = 2) + ## if you want to color by Species of penguins
+  labs(title = "Colonies and SST")
+plot_geospatial3
+
+
+### Add the SST to the specific GPS positions:
+library(stars)
+## Convert the SST raster object to stars format:
+starsSST <- st_as_stars(pr.SST, crs = st_crs(4326))
+## Make sure the GPS object is in the same format as the SST object:
+random_GPS_points30dfsf <- st_as_sf(random_GPS_points30df, coords = c("X", "Y"), crs = 4326)
+
+## Extract cell values (SST values) at point locations (GPS locations):
+SSTextractGPS <- st_extract(starsSST, random_GPS_points30dfsf) %>% st_as_sf() 
+
+## Combine the GPS position where we have the penguins information with the extracted SST info for those GPS positions
+GPSxySST <- cbind(random_GPS_points30dfsf, SSTextractGPS) 
+
+## Convert the column geometry in coordinates X and Y then extract it
+GPSxySSTcoord <- st_coordinates(GPSxySST)
+## Attach the coordinates in the X and Y format to our table
+GPSSSTcombined <- cbind(GPSxySST, GPSxySSTcoord)
+GPSSSTcombined
+```
+
+
+
