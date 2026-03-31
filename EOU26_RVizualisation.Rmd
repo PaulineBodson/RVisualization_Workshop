@@ -468,13 +468,13 @@ Penguins_SpeciesIsland_plot <- ggplot(Penguinslong, aes(x = as.factor(SPECIES), 
   scale_y_continuous("value", position = "right")  # change the y-axis scale on the right
 Penguins_SpeciesIsland_plot
 
-### Try to export the plot directly from the console while having control over the size of the text and lines:
-setwd("~/Desktop")
-library(ragg)
+### Try to export the plot directly from the console while having control over the size of the text and lines, you will need to set your directories:
+#setwd("~/Desktop") 
+#library(ragg)
 ## Scaling change the size of the text on my plot
-ragg::agg_png("Penguins_SpeciesIsland_plot_20x20_2.png", width = 20, height = 20, units = "in", res = 300, scaling = 2)
-Penguins_SpeciesIsland_plot
-dev.off()
+#ragg::agg_png("Penguins_SpeciesIsland_plot_20x20_2.png", width = 20, height = 20, units = "in", res = 300, scaling = 2)
+#Penguins_SpeciesIsland_plot
+#dev.off()
 
 
 ```
